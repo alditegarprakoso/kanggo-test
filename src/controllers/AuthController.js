@@ -13,25 +13,14 @@ exports.register = async (req, res) => {
         "string.min": "Name must be 3 characters",
         "string.empty": "Name is required",
       }),
-      emailRegister: Joi.string().email().min(5).required().messages({
+      email: Joi.string().email().min(5).required().messages({
         "string.min": "Email must be 5 characters",
         "string.email": "Invalid email",
         "string.empty": "Email is required",
       }),
-      passwordRegister: Joi.string().min(5).required().messages({
+      password: Joi.string().min(5).required().messages({
         "string.min": "Password must be 5 characters",
         "string.empty": "Password is required",
-      }),
-      gender: Joi.string().required().messages({
-        "string.empty": "Gender is required",
-      }),
-      phone: Joi.number().integer().required().messages({
-        "number.integer": "Phone must be a number",
-        "number.empty": "Phone is required",
-      }),
-      address: Joi.string().min(12).required().messages({
-        "string.min": "Address must be 12 characters",
-        "string.empty": "Address is required",
       }),
     });
 
@@ -45,16 +34,9 @@ exports.register = async (req, res) => {
       });
     }
 
-    if (data.phone.length < 12) {
-      return res.status(400).send({
-        status: "error",
-        message: "Phone must be 12 characters",
-      });
-    }
-
-    const emailExist = await User.findOne({
+    const emailExist = await users.findOne({
       where: {
-        email: data.emailRegister,
+        email: data.email,
       },
     });
 
@@ -65,42 +47,88 @@ exports.register = async (req, res) => {
       });
     }
 
-    const phoneExist = await User.findOne({
-      where: {
-        phone: data.phone,
-      },
-    });
-
-    if (phoneExist) {
-      return res.status(400).send({
-        status: "error",
-        message: "Phone number already exist",
-      });
-    }
-
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(req.body.passwordRegister, salt);
+    const hashedPassword = await bcrypt.hash(req.body.password, salt);
 
-    const addUser = await User.create({
+    const addUser = await users.create({
       name: data.name,
-      email: data.emailRegister,
+      email: data.email,
       password: hashedPassword,
-      status: "customer",
-      gender: data.gender,
-      phone: data.phone,
-      address: data.address,
     });
 
     return res.status(201).send({
-      status: "success",
+      status: "register success",
       data: {
         name: addUser.name,
         email: addUser.email,
-        password: addUser.password,
-        status: addUser.status,
-        gender: addUser.gender,
-        phone: addUser.phone,
-        address: addUser.address,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send({
+      status: "failed",
+      message: "Server Error",
+    });
+  }
+};
+
+exports.login = async (req, res) => {
+  const data = req.body;
+
+  const schema = Joi.object({
+    email: Joi.string().email().required().messages({
+      "string.email": "Invalid email",
+      "string.empty": "Email is required",
+    }),
+    password: Joi.string().required().messages({
+      "string.empty": "Password is required",
+    }),
+  });
+
+  const { error } = schema.validate(data);
+
+  if (error) {
+    return res.status(400).send({
+      status: "error",
+      message: error.details[0].message,
+    });
+  }
+
+  try {
+    const userExist = await users.findOne({
+      where: {
+        email: data.email,
+      },
+      attributes: {
+        exclude: ["createdAt", "updateAt"],
+      },
+    });
+
+    if (!userExist) {
+      return res.status(400).send({
+        status: "failed",
+        message: "Email doesn't exist",
+      });
+    }
+
+    const isMatch = await bcrypt.compare(data.password, userExist.password);
+
+    if (!isMatch) {
+      return res.status(400).send({
+        status: "failed",
+        message: "Password doesn't match",
+      });
+    }
+
+    const token = jwt.sign({ id: userExist.id }, process.env.TOKEN_KEY);
+
+    return res.status(200).send({
+      status: "login success",
+      data: {
+        id: userExist.id,
+        name: userExist.name,
+        email: userExist.email,
+        token,
       },
     });
   } catch (error) {
