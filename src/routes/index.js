@@ -16,6 +16,8 @@ const {
 const {
   getTransactions,
   addTransaction,
+  updateTransaction,
+  getTransaction,
 } = require("../controllers/TransactionsController");
 
 const {
@@ -40,7 +42,9 @@ router.delete("/product/:id", auth, deleteProduct);
 
 // Transactions
 router.get("/transactions", getTransactions);
+router.get("/transaction/:id", getTransaction);
 router.post("/transaction", auth, addTransaction);
+router.patch("/transaction/:id", updateTransaction);
 
 // Payments
 router.get("/payments", getPayments);

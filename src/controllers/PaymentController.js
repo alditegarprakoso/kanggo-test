@@ -92,7 +92,7 @@ exports.updatePayment = async (req, res) => {
       return res.status(400).send({
         status: "error",
         message:
-          "quantity exceeds product stock, please edit quantity on your transaction or contact admin",
+          "quantity exceeds product stock, please edit quantity on your transaction or contact our admin",
       });
     }
 
@@ -111,7 +111,6 @@ exports.updatePayment = async (req, res) => {
     const updateProduct = await products.update(
       {
         qty: dataProduct.qty - dataTransaction.qty,
-        status: "paid",
       },
       {
         where: {

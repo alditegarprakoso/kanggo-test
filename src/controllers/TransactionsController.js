@@ -41,6 +41,51 @@ exports.getTransactions = async (req, res) => {
   }
 };
 
+exports.getTransaction = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    let data = await transactions.findOne({
+      where: {
+        id,
+      },
+      attributes: {
+        exclude: ["createdAt", "updatedAt"],
+      },
+      include: [
+        {
+          model: products,
+          as: "product",
+          attributes: {
+            exclude: ["createdAt", "updatedAt"],
+          },
+        },
+        {
+          model: users,
+          as: "user",
+          attributes: {
+            exclude: ["createdAt", "updatedAt", "password"],
+          },
+        },
+      ],
+    });
+
+    data = JSON.parse(JSON.stringify(data));
+
+    return res.status(200).send({
+      status: "success",
+      message: "success get data transaction",
+      data,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send({
+      status: "failed",
+      message: "Internal Server Error",
+    });
+  }
+};
+
 exports.addTransaction = async (req, res) => {
   try {
     let data = req.body;
@@ -115,7 +160,8 @@ exports.addTransaction = async (req, res) => {
     if (dataProduct.qty - data.qty < 0) {
       return res.status(400).send({
         status: "error",
-        message: "quantity exceeds product stock",
+        message:
+          "quantity exceeds product stock, please edit quantity on your transaction or contact our admin",
       });
     }
 
@@ -161,6 +207,106 @@ exports.addTransaction = async (req, res) => {
     return res.status(500).send({
       status: "failed",
       message: "transaction failed",
+    });
+  }
+};
+
+exports.updateTransaction = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    const schema = Joi.object({
+      qty: Joi.number().integer().required().messages({
+        "number.integer": "QTY must be a number",
+        "number.empty": "QTY is required",
+      }),
+    });
+
+    const { error } = schema.validate(data);
+
+    if (error) {
+      console.log(error);
+      return res.status(400).send({
+        status: "error",
+        message: error.details[0].message,
+      });
+    }
+
+    const dataTransaction = await transactions.findOne({
+      where: {
+        id: id,
+      },
+    });
+
+    if (!dataTransaction) {
+      return res.status(404).send({
+        status: "error",
+        message: "data transaction not found",
+      });
+    }
+
+    const dataProduct = await products.findOne({
+      where: {
+        id: dataTransaction.product_id,
+      },
+    });
+
+    if (dataProduct.qty - data.qty < 0) {
+      return res.status(400).send({
+        status: "error",
+        message:
+          "quantity exceeds product stock, please edit quantity on your transaction or contact our admin",
+      });
+    }
+
+    const updateTransaction = await transactions.update(
+      {
+        qty: data.qty,
+        amount: data.qty * dataProduct.price,
+      },
+      {
+        where: {
+          id: dataTransaction.id,
+        },
+      }
+    );
+
+    let dataResponse = await transactions.findOne({
+      where: {
+        id: dataTransaction.id,
+      },
+      attributes: {
+        exclude: ["createdAt", "updatedAt"],
+      },
+      include: [
+        {
+          model: products,
+          as: "product",
+          attributes: {
+            exclude: ["createdAt", "updatedAt"],
+          },
+        },
+        {
+          model: users,
+          as: "user",
+          attributes: {
+            exclude: ["createdAt", "updatedAt", "password"],
+          },
+        },
+      ],
+    });
+
+    return res.status(200).send({
+      status: "success",
+      message: "success update transaction",
+      dataResponse,
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).send({
+      status: "failed",
+      message: "Internal Server Error",
     });
   }
 };
